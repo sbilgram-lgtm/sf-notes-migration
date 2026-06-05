@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { assessNotes, assessAttachments, assessFiles, assessLimits, assessCreationControls, getAuthStatus } from '../services/api';
 import { AssessmentResult, AuthStatus, OBJECT_PREFIX_MAP } from '../types/assessment';
+import { generatePDFReport, generateExcelReport } from '../utils/reportGenerator';
 import { formatBytes, formatNumber, pct } from '../utils/format';
 
 type LoadState = 'idle' | 'loading' | 'done' | 'error';
@@ -149,17 +150,55 @@ export const DashboardPage: React.FC = () => {
             {authStatus?.instanceUrl} &middot; {authStatus?.instanceName}
           </p>
         </div>
-        <button
-          onClick={runAssessment}
-          disabled={running}
-          style={{
-            backgroundColor: running ? '#95a5a6' : '#1a2f4e', color: 'white', border: 'none',
-            padding: '12px 28px', borderRadius: '8px', fontSize: '0.95rem',
-            fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {running ? 'Running Assessment…' : anyRun ? 'Re-run Assessment' : 'Run Assessment'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={runAssessment}
+            disabled={running}
+            style={{
+              backgroundColor: running ? '#95a5a6' : '#1a2f4e', color: 'white', border: 'none',
+              padding: '12px 28px', borderRadius: '8px', fontSize: '0.95rem',
+              fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {running ? 'Running Assessment…' : anyRun ? 'Re-run Assessment' : 'Run Assessment'}
+          </button>
+          {allDone && anyRun && (
+            <>
+              <button
+                onClick={() => generatePDFReport(result, {
+                  orgName: authStatus?.orgName || null,
+                  orgId: authStatus?.orgId || null,
+                  instanceUrl: authStatus?.instanceUrl || null,
+                  isSandbox: authStatus?.isSandbox || false,
+                  instanceName: authStatus?.instanceName || null,
+                })}
+                style={{
+                  backgroundColor: '#e74c3c', color: 'white', border: 'none',
+                  padding: '12px 20px', borderRadius: '8px', fontSize: '0.95rem',
+                  fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                Export PDF
+              </button>
+              <button
+                onClick={() => generateExcelReport(result, {
+                  orgName: authStatus?.orgName || null,
+                  orgId: authStatus?.orgId || null,
+                  instanceUrl: authStatus?.instanceUrl || null,
+                  isSandbox: authStatus?.isSandbox || false,
+                  instanceName: authStatus?.instanceName || null,
+                })}
+                style={{
+                  backgroundColor: '#27ae60', color: 'white', border: 'none',
+                  padding: '12px 20px', borderRadius: '8px', fontSize: '0.95rem',
+                  fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                Export Excel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Summary row — only after all done */}
