@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { assessNotes, assessAttachments, assessFiles, assessLimits, assessCreationControls, getAuthStatus } from '../services/api';
 import { AssessmentResult, AuthStatus, OBJECT_PREFIX_MAP } from '../types/assessment';
-import { generatePDFReport, generateExcelReport } from '../utils/reportGenerator';
+import { generateExcelReport } from '../utils/reportGenerator';
+import { ReportPreview } from '../components/ReportPreview';
 import { formatBytes, formatNumber, pct } from '../utils/format';
 
 type LoadState = 'idle' | 'loading' | 'done' | 'error';
@@ -83,6 +84,7 @@ export const DashboardPage: React.FC = () => {
     files: { state: 'idle' }, limits: { state: 'idle' }, creationControls: { state: 'idle' }
   });
   const [running, setRunning] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     getAuthStatus().then(setAuthStatus).catch(() => {});
@@ -163,40 +165,16 @@ export const DashboardPage: React.FC = () => {
             {running ? 'Running Assessment…' : anyRun ? 'Re-run Assessment' : 'Run Assessment'}
           </button>
           {allDone && anyRun && (
-            <>
-              <button
-                onClick={() => generatePDFReport(result, {
-                  orgName: authStatus?.orgName || null,
-                  orgId: authStatus?.orgId || null,
-                  instanceUrl: authStatus?.instanceUrl || null,
-                  isSandbox: authStatus?.isSandbox || false,
-                  instanceName: authStatus?.instanceName || null,
-                })}
-                style={{
-                  backgroundColor: '#e74c3c', color: 'white', border: 'none',
-                  padding: '12px 20px', borderRadius: '8px', fontSize: '0.95rem',
-                  fontWeight: 600, cursor: 'pointer'
-                }}
-              >
-                Export PDF
-              </button>
-              <button
-                onClick={() => generateExcelReport(result, {
-                  orgName: authStatus?.orgName || null,
-                  orgId: authStatus?.orgId || null,
-                  instanceUrl: authStatus?.instanceUrl || null,
-                  isSandbox: authStatus?.isSandbox || false,
-                  instanceName: authStatus?.instanceName || null,
-                })}
-                style={{
-                  backgroundColor: '#27ae60', color: 'white', border: 'none',
-                  padding: '12px 20px', borderRadius: '8px', fontSize: '0.95rem',
-                  fontWeight: 600, cursor: 'pointer'
-                }}
-              >
-                Export Excel
-              </button>
-            </>
+            <button
+              onClick={() => setShowPreview(true)}
+              style={{
+                backgroundColor: '#8e44ad', color: 'white', border: 'none',
+                padding: '12px 20px', borderRadius: '8px', fontSize: '0.95rem',
+                fontWeight: 600, cursor: 'pointer'
+              }}
+            >
+              Preview &amp; Export
+            </button>
           )}
         </div>
       </div>
@@ -403,6 +381,19 @@ export const DashboardPage: React.FC = () => {
         {sections.creationControls.state === 'loading' && <p style={{ color: '#3498db', fontSize: '0.85rem', margin: 0 }}>Checking creation controls…</p>}
       </div>
 
+      {showPreview && (
+        <ReportPreview
+          result={result}
+          meta={{
+            orgName: authStatus?.orgName || null,
+            orgId: authStatus?.orgId || null,
+            instanceUrl: authStatus?.instanceUrl || null,
+            isSandbox: authStatus?.isSandbox || false,
+            instanceName: authStatus?.instanceName || null,
+          }}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 };
