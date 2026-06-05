@@ -278,14 +278,14 @@ app.get('/api/assess/creation-controls', async (req, res) => {
 
     // Profiles and Permission Sets that still grant Create on Note or Attachment
     const permResult = await safeQuery(conn,
-      "SELECT Parent.Name, Parent.Type, SObjectType FROM ObjectPermissions " +
+      "SELECT Parent.Name, Parent.IsOwnedByProfile, SObjectType FROM ObjectPermissions " +
       "WHERE SObjectType IN ('Note','Attachment') AND PermissionsCreate = true " +
-      "ORDER BY SObjectType, Parent.Type, Parent.Name"
+      "ORDER BY SObjectType, Parent.IsOwnedByProfile, Parent.Name"
     );
 
     const permissions = (permResult.records || []).map(r => ({
       name: r.Parent ? r.Parent.Name : 'Unknown',
-      type: r.Parent ? r.Parent.Type : 'Unknown',
+      type: r.Parent && r.Parent.IsOwnedByProfile ? 'Profile' : 'PermissionSet',
       sObjectType: r.SObjectType
     }));
 
