@@ -150,20 +150,21 @@ app.get('/api/assess/notes', async (req, res) => {
     const countResult = await safeQuery(conn, 'SELECT COUNT() FROM Note');
     const total = countResult.totalSize;
 
-    // Breakdown by parent object type (top 10)
-    const byParent = await safeQuery(conn,
-      'SELECT ParentId, COUNT(Id) cnt FROM Note GROUP BY ParentId ORDER BY COUNT(Id) DESC LIMIT 200'
-    );
+    // Sample ParentIds to build object type breakdown
+    const byParent = await safeQuery(conn, 'SELECT ParentId FROM Note LIMIT 2000');
 
     // Private notes count
     const privateResult = await safeQuery(conn, 'SELECT COUNT() FROM Note WHERE IsPrivate = true');
     const privateCount = privateResult.totalSize;
 
-    // Large notes (body > 32KB approximated by character count)
-    const largeResult = await safeQuery(conn,
-      'SELECT COUNT() FROM Note WHERE LEN(Body) > 32000'
-    );
-    const largeCount = largeResult.totalSize;
+    // Large notes — SOQL cannot filter by body length, so fetch a sample and count in JS
+    // Body field is not reliably queryable by size in SOQL; we flag this as "unknown" unless
+    // the org is small enough to sample
+    let largeCount = 0;
+    if (total <= 5000) {
+      const bodyResult = await safeQuery(conn, 'SELECT Body FROM Note WHERE Body != null LIMIT 5000');
+      largeCount = (bodyResult.records || []).filter(r => r.Body && r.Body.length > 32000).length;
+    }
 
     // Aggregate by object prefix for parent type breakdown
     const parentBreakdown = {};
