@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { assessNotes, assessAttachments, assessFiles, assessLimits, getAuthStatus } from '../services/api';
+import { assessNotes, assessAttachments, assessFiles, assessLimits, assessCreationControls, getAuthStatus } from '../services/api';
 import { AssessmentResult, AuthStatus, OBJECT_PREFIX_MAP } from '../types/assessment';
 import { formatBytes, formatNumber, pct } from '../utils/format';
 
@@ -76,10 +76,10 @@ function ParentBreakdown({ breakdown }: { breakdown: Record<string, number> }) {
 
 export const DashboardPage: React.FC = () => {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [result, setResult] = useState<AssessmentResult>({ notes: null, attachments: null, files: null, limits: null });
+  const [result, setResult] = useState<AssessmentResult>({ notes: null, attachments: null, files: null, limits: null, creationControls: null });
   const [sections, setSections] = useState<Record<string, SectionState>>({
     notes: { state: 'idle' }, attachments: { state: 'idle' },
-    files: { state: 'idle' }, limits: { state: 'idle' }
+    files: { state: 'idle' }, limits: { state: 'idle' }, creationControls: { state: 'idle' }
   });
   const [running, setRunning] = useState(false);
 
@@ -93,8 +93,8 @@ export const DashboardPage: React.FC = () => {
 
   const runAssessment = async () => {
     setRunning(true);
-    setSections({ notes: { state: 'idle' }, attachments: { state: 'idle' }, files: { state: 'idle' }, limits: { state: 'idle' } });
-    setResult({ notes: null, attachments: null, files: null, limits: null });
+    setSections({ notes: { state: 'idle' }, attachments: { state: 'idle' }, files: { state: 'idle' }, limits: { state: 'idle' }, creationControls: { state: 'idle' } });
+    setResult({ notes: null, attachments: null, files: null, limits: null, creationControls: null });
 
     // Run all four in parallel
     const run = async (key: string, fn: () => Promise<any>, setter: (v: any) => void) => {
@@ -109,10 +109,11 @@ export const DashboardPage: React.FC = () => {
     };
 
     await Promise.all([
-      run('notes',       assessNotes,       (v) => setResult(r => ({ ...r, notes: v }))),
-      run('attachments', assessAttachments, (v) => setResult(r => ({ ...r, attachments: v }))),
-      run('files',       assessFiles,       (v) => setResult(r => ({ ...r, files: v }))),
-      run('limits',      assessLimits,      (v) => setResult(r => ({ ...r, limits: v }))),
+      run('notes',            assessNotes,            (v) => setResult(r => ({ ...r, notes: v }))),
+      run('attachments',      assessAttachments,      (v) => setResult(r => ({ ...r, attachments: v }))),
+      run('files',            assessFiles,            (v) => setResult(r => ({ ...r, files: v }))),
+      run('limits',           assessLimits,           (v) => setResult(r => ({ ...r, limits: v }))),
+      run('creationControls', assessCreationControls, (v) => setResult(r => ({ ...r, creationControls: v }))),
     ]);
 
     setRunning(false);
@@ -286,6 +287,81 @@ export const DashboardPage: React.FC = () => {
         )}
         {sections.limits.state === 'idle' && <p style={{ color: '#bdc3c7', fontSize: '0.85rem', margin: 0 }}>Click Run Assessment to begin.</p>}
         {sections.limits.state === 'loading' && <p style={{ color: '#3498db', fontSize: '0.85rem', margin: 0 }}>Checking limits…</p>}
+      </div>
+
+      {/* Creation Controls section */}
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, color: '#1a2f4e' }}>Creation Controls</h3>
+          <StatusBadge state={sections.creationControls.state} />
+        </div>
+        {sections.creationControls.state === 'error' && (
+          <p style={{ color: '#e74c3c', fontSize: '0.85rem' }}>Error: {sections.creationControls.error}</p>
+        )}
+        {result.creationControls && (() => {
+          const cc = result.creationControls!;
+          const notePerms = cc.permissions.filter(p => p.sObjectType === 'Note');
+          const attachPerms = cc.permissions.filter(p => p.sObjectType === 'Attachment');
+          return (
+            <>
+              {/* Org-level createable flags */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <div style={{ ...statBox, flex: 1 }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: cc.noteCreateable ? '#e74c3c' : '#27ae60' }}>
+                    {cc.noteCreateable ? 'Still Createable' : 'Creation Disabled'}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#7f8c8d', marginTop: '2px' }}>Legacy Notes — Org Setting</div>
+                  {cc.noteCreateable && <div style={{ fontSize: '0.72rem', color: '#e74c3c', marginTop: '4px' }}>New Notes can still be created in this org</div>}
+                </div>
+                <div style={{ ...statBox, flex: 1 }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: cc.attachCreateable ? '#e74c3c' : '#27ae60' }}>
+                    {cc.attachCreateable ? 'Still Createable' : 'Creation Disabled'}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#7f8c8d', marginTop: '2px' }}>Attachments — Org Setting</div>
+                  {cc.attachCreateable && <div style={{ fontSize: '0.72rem', color: '#e74c3c', marginTop: '4px' }}>New Attachments can still be created in this org</div>}
+                </div>
+              </div>
+
+              {/* Profiles / Permission Sets with Create permission */}
+              {cc.permissions.length === 0 ? (
+                <div style={{ backgroundColor: '#eafaf1', borderRadius: '8px', padding: '12px 16px', fontSize: '0.85rem', color: '#27ae60' }}>
+                  No Profiles or Permission Sets grant Create on Notes or Attachments.
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', margin: '0 0 10px' }}>
+                    Profiles &amp; Permission Sets with Create permission
+                  </p>
+                  {[{ label: 'Notes', perms: notePerms }, { label: 'Attachments', perms: attachPerms }].map(({ label, perms }) =>
+                    perms.length > 0 && (
+                      <div key={label} style={{ marginBottom: '14px' }}>
+                        <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#e74c3c', margin: '0 0 6px' }}>{label}</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {perms.map((p, i) => (
+                            <span key={i} style={{
+                              backgroundColor: p.type === 'Profile' ? '#fdf0ed' : '#fef9e7',
+                              color: p.type === 'Profile' ? '#c0392b' : '#7d6608',
+                              border: `1px solid ${p.type === 'Profile' ? '#f5c6c0' : '#f0e68c'}`,
+                              borderRadius: '4px', fontSize: '0.75rem',
+                              padding: '3px 8px', fontWeight: 500
+                            }}>
+                              {p.type === 'Profile' ? '👤' : '🔑'} {p.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  )}
+                  <p style={{ fontSize: '0.72rem', color: '#95a5a6', margin: '8px 0 0' }}>
+                    👤 Profile &nbsp;|&nbsp; 🔑 Permission Set — review these in Setup → Profiles / Permission Sets to remove Create access.
+                  </p>
+                </>
+              )}
+            </>
+          );
+        })()}
+        {sections.creationControls.state === 'idle' && <p style={{ color: '#bdc3c7', fontSize: '0.85rem', margin: 0 }}>Click Run Assessment to begin.</p>}
+        {sections.creationControls.state === 'loading' && <p style={{ color: '#3498db', fontSize: '0.85rem', margin: 0 }}>Checking creation controls…</p>}
       </div>
 
     </div>

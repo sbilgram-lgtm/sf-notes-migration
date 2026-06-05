@@ -27,11 +27,24 @@ export interface LimitsAssessment {
   apiRequestsRemaining: number;
 }
 
+export interface PermissionEntry {
+  name: string;
+  type: string;
+  sObjectType: string;
+}
+
+export interface CreationControlsAssessment {
+  noteCreateable: boolean;
+  attachCreateable: boolean;
+  permissions: PermissionEntry[];
+}
+
 export interface AssessmentResult {
   notes: NotesAssessment | null;
   attachments: AttachmentsAssessment | null;
   files: FilesAssessment | null;
   limits: LimitsAssessment | null;
+  creationControls: CreationControlsAssessment | null;
 }
 
 export interface AuthStatus {

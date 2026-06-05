@@ -258,6 +258,44 @@ app.get('/api/assess/limits', async (req, res) => {
   }
 });
 
+app.get('/api/assess/creation-controls', async (req, res) => {
+  if (!req.session.accessToken) return res.status(401).json({ error: 'Not authenticated' });
+  const conn = getConnection(req);
+  try {
+    // Check if Note and Attachment are createable at the org level
+    const noteDescribeUrl = `${req.session.instanceUrl}/services/data/v59.0/sobjects/Note/describe`;
+    const attachDescribeUrl = `${req.session.instanceUrl}/services/data/v59.0/sobjects/Attachment/describe`;
+
+    const [noteResp, attachResp] = await Promise.all([
+      fetch(noteDescribeUrl, { headers: { Authorization: `Bearer ${req.session.accessToken}` } }),
+      fetch(attachDescribeUrl, { headers: { Authorization: `Bearer ${req.session.accessToken}` } })
+    ]);
+
+    const [noteDesc, attachDesc] = await Promise.all([noteResp.json(), attachResp.json()]);
+
+    const noteCreateable = noteDesc.createable === true;
+    const attachCreateable = attachDesc.createable === true;
+
+    // Profiles and Permission Sets that still grant Create on Note or Attachment
+    const permResult = await safeQuery(conn,
+      "SELECT Parent.Name, Parent.Type, SObjectType FROM ObjectPermissions " +
+      "WHERE SObjectType IN ('Note','Attachment') AND PermissionsCreate = true " +
+      "ORDER BY SObjectType, Parent.Type, Parent.Name"
+    );
+
+    const permissions = (permResult.records || []).map(r => ({
+      name: r.Parent ? r.Parent.Name : 'Unknown',
+      type: r.Parent ? r.Parent.Type : 'Unknown',
+      sObjectType: r.SObjectType
+    }));
+
+    res.json({ noteCreateable, attachCreateable, permissions });
+  } catch (err) {
+    console.error('Creation controls error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Serve React in production ─────────────────────────────────────────────────
 
 if (isProduction) {
