@@ -162,7 +162,7 @@ app.get('/api/assess/notes', async (req, res) => {
     // the org is small enough to sample
     let largeCount = 0;
     if (total <= 5000) {
-      const bodyResult = await safeQuery(conn, 'SELECT Body FROM Note WHERE Body != null LIMIT 5000');
+      const bodyResult = await safeQuery(conn, 'SELECT Body FROM Note LIMIT 5000');
       largeCount = (bodyResult.records || []).filter(r => r.Body && r.Body.length > 32000).length;
     }
 
@@ -187,9 +187,9 @@ app.get('/api/assess/attachments', async (req, res) => {
     const countResult = await safeQuery(conn, 'SELECT COUNT() FROM Attachment');
     const total = countResult.totalSize;
 
-    // Total size in bytes
-    const sizeResult = await safeQuery(conn, 'SELECT SUM(BodyLength) totalBytes FROM Attachment');
-    const totalBytes = sizeResult.records[0] ? (sizeResult.records[0].totalBytes || 0) : 0;
+    // Total size in bytes — SOQL aggregate aliases return as expr0
+    const sizeResult = await safeQuery(conn, 'SELECT SUM(BodyLength) FROM Attachment');
+    const totalBytes = sizeResult.records[0] ? (sizeResult.records[0].expr0 || 0) : 0;
 
     // Large attachments > 25MB (REST API limit)
     const largeResult = await safeQuery(conn, 'SELECT COUNT() FROM Attachment WHERE BodyLength > 26214400');
@@ -219,8 +219,8 @@ app.get('/api/assess/files', async (req, res) => {
     const countResult = await safeQuery(conn, 'SELECT COUNT() FROM ContentDocument');
     const total = countResult.totalSize;
 
-    const sizeResult = await safeQuery(conn, 'SELECT SUM(ContentSize) totalBytes FROM ContentVersion WHERE IsLatest = true');
-    const totalBytes = sizeResult.records[0] ? (sizeResult.records[0].totalBytes || 0) : 0;
+    const sizeResult = await safeQuery(conn, 'SELECT SUM(ContentSize) FROM ContentVersion WHERE IsLatest = true');
+    const totalBytes = sizeResult.records[0] ? (sizeResult.records[0].expr0 || 0) : 0;
 
     res.json({ total, totalBytes });
   } catch (err) {
